@@ -43,13 +43,17 @@ contract RewardyDualEntryAccount {
     }
 
     struct Fee {
-        address token;      // zero = ETH
-        uint256 amount;     // zero = no fee
+        address token; // zero = ETH
+        uint256 amount; // zero = no fee
         address receiver;
     }
 
     event CallExecuted(address indexed to, uint256 value, bytes data);
-    event BatchExecuted(uint256 indexed nonce, uint256 callCount, bytes32 callsHash);
+    event BatchExecuted(
+        uint256 indexed nonce,
+        uint256 callCount,
+        bytes32 callsHash
+    );
     event FeeCharged(address indexed token, address indexed to, uint256 amount);
 
     constructor(address entryPoint_, address altEntryPoint_) {
@@ -62,7 +66,8 @@ contract RewardyDualEntryAccount {
         address ep = address(ENTRY_POINT);
         require(
             msg.sender == ep ||
-                (ALT_ENTRY_POINT != address(0) && msg.sender == ALT_ENTRY_POINT),
+                (ALT_ENTRY_POINT != address(0) &&
+                    msg.sender == ALT_ENTRY_POINT),
             "only EP"
         );
         _;
@@ -70,8 +75,12 @@ contract RewardyDualEntryAccount {
 
     /* ========================= 4337 PATH ========================= */
 
-    function execute(address target, uint256 value, bytes calldata data) external payable onlyEP {
-        InternalCall;
+    function execute(
+        address target,
+        uint256 value,
+        bytes calldata data
+    ) external payable onlyEP {
+        InternalCall[] memory calls = new InternalCall[](1); // ✅ Declare and initialize
         calls[0] = InternalCall({to: target, value: value, data: data});
         _executeBatch(calls);
     }
@@ -94,7 +103,9 @@ contract RewardyDualEntryAccount {
         uint256 missingAccountFunds
     ) external onlyEP returns (uint256) {
         if (missingAccountFunds > 0) {
-            (bool ok, ) = payable(msg.sender).call{value: missingAccountFunds}("");
+            (bool ok, ) = payable(msg.sender).call{value: missingAccountFunds}(
+                ""
+            );
             ok;
         }
         return 0;
@@ -112,9 +123,15 @@ contract RewardyDualEntryAccount {
         return nonce;
     }
 
-    function isValidSignature(bytes32 hash, bytes calldata signature) external view returns (bytes4) {
+    function isValidSignature(
+        bytes32 hash,
+        bytes calldata signature
+    ) external view returns (bytes4) {
         address recovered = ECDSA.recover(hash, signature);
-        return recovered == address(this) ? bytes4(0x1626ba7e) : bytes4(0xffffffff);
+        return
+            recovered == address(this)
+                ? bytes4(0x1626ba7e)
+                : bytes4(0xffffffff);
     }
 
     /* ========================= 7702 TYPE-4 PATH ========================= */
@@ -154,7 +171,14 @@ contract RewardyDualEntryAccount {
 
         bytes32 callsHash = _hashCallsCalldata(calls);
         bytes32 digest = keccak256(
-            abi.encode(callsHash, fee.token, fee.amount, fee.receiver, nonce, deadline)
+            abi.encode(
+                callsHash,
+                fee.token,
+                fee.amount,
+                fee.receiver,
+                nonce,
+                deadline
+            )
         );
         bytes32 ethHash = MessageHashUtils.toEthSignedMessageHash(digest);
         address recovered = ECDSA.recover(ethHash, signature);
@@ -165,7 +189,10 @@ contract RewardyDualEntryAccount {
                 (bool ok, ) = payable(fee.receiver).call{value: fee.amount}("");
                 require(ok, "Rewardy: fee eth failed");
             } else {
-                require(IERC20(fee.token).transfer(fee.receiver, fee.amount), "Rewardy: fee token failed");
+                require(
+                    IERC20(fee.token).transfer(fee.receiver, fee.amount),
+                    "Rewardy: fee token failed"
+                );
             }
             emit FeeCharged(fee.token, fee.receiver, fee.amount);
         }
@@ -178,7 +205,9 @@ contract RewardyDualEntryAccount {
         nonce = current + 1;
 
         for (uint256 i = 0; i < calls.length; i++) {
-            (bool ok, ) = calls[i].to.call{value: calls[i].value}(calls[i].data);
+            (bool ok, ) = calls[i].to.call{value: calls[i].value}(
+                calls[i].data
+            );
             require(ok, "Rewardy: call reverted");
             emit CallExecuted(calls[i].to, calls[i].value, calls[i].data);
         }
@@ -186,18 +215,32 @@ contract RewardyDualEntryAccount {
         emit BatchExecuted(current, calls.length, _hashCallsMemory(calls));
     }
 
-    function _hashCallsCalldata(InternalCall[] calldata calls) internal pure returns (bytes32) {
+    function _hashCallsCalldata(
+        InternalCall[] calldata calls
+    ) internal pure returns (bytes32) {
         bytes memory enc;
         for (uint256 i = 0; i < calls.length; i++) {
-            enc = abi.encodePacked(enc, calls[i].to, calls[i].value, calls[i].data);
+            enc = abi.encodePacked(
+                enc,
+                calls[i].to,
+                calls[i].value,
+                calls[i].data
+            );
         }
         return keccak256(enc);
     }
 
-    function _hashCallsMemory(InternalCall[] memory calls) internal pure returns (bytes32) {
+    function _hashCallsMemory(
+        InternalCall[] memory calls
+    ) internal pure returns (bytes32) {
         bytes memory enc;
         for (uint256 i = 0; i < calls.length; i++) {
-            enc = abi.encodePacked(enc, calls[i].to, calls[i].value, calls[i].data);
+            enc = abi.encodePacked(
+                enc,
+                calls[i].to,
+                calls[i].value,
+                calls[i].data
+            );
         }
         return keccak256(enc);
     }
